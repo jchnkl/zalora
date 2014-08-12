@@ -4,6 +4,7 @@
 module Types
     ( Item(..)
     , Key(..)
+    , Error(..)
     ) where
 
 import Data.Text.Lazy (Text)
@@ -21,8 +22,17 @@ data Item a = Item { description :: String
                    }
     deriving (Read, Show)
 
-instance ToJSON (Key) where
+data Error = Error { status :: Int
+                   , message :: Text
+                   , exception :: Text
+                   }
+    deriving (Read, Show)
+
+instance ToJSON Key where
     toJSON (Key k) = object ["key" .= k]
+
+instance ToJSON Error where
+    toJSON (Error s m e) = object ["status" .= s, "message" .= m, "exception" .= e]
 
 instance FromJSON (Item Text) where
     parseJSON (Object v) = Item <$> v .: "description"

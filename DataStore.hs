@@ -14,12 +14,12 @@ import Data.ByteString.Lazy as BL (writeFile)
 import Data.ByteString.Char8 (pack)
 import Data.ByteString.Base64.Lazy (decodeLenient)
 import Crypto.Hash.SHA1 (hash)
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, removeFile)
 import System.FilePath.Posix ((</>))
 
 
 import Control.Monad (void)
-import Control.Exception (bracket)
+import Control.Exception (finally, bracket)
 import Database.HDBC
 import Database.HDBC.Sqlite3
 
@@ -79,5 +79,5 @@ getItem (StoreCtx c _) (Key k) = fmap (sqlValueToItem . head) $ withTransaction 
 putItem :: StoreCtx -> Item Text -> IO Key
 putItem ctx item = do
     item' <- fmap (\p -> item {image=p}) $ putImage (image item)
-    putItemWithKey ctx (makeKey item') item'
+    putItemWithKey ctx (makeKey item') item' `finally` removeFile (image item')
     return $ makeKey item'

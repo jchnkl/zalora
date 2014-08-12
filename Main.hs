@@ -37,7 +37,15 @@ itemHtml (Item d c s p) = mconcat
 
 main :: IO ()
 main = withDataStore $ \ctx -> scotty servicePort $ do
-    post "/" $ jsonItem >>= liftIO . putItem ctx >>= json
-    get "/items" $ liftIO (getKeys ctx) >>= html . itemsHtml
+    -- Simple JSON error handler for 500 (exceptions)
+    defaultHandler   $ json . Error 500 "internal server error"
+    -- Simple JSON error handler for 400 (not found)
+    notFound         $ json $ Error 400 "client error" "service not found"
+    -- POSTing an item
+    post "/"         $ jsonItem >>= liftIO . putItem ctx >>= json
+    -- GETting a list of items
+    get "/items"     $ liftIO (getKeys ctx) >>= html . itemsHtml
+    -- GETting a single item
     get "/item/:key" $ param "key" >>= liftIO . getItem ctx . Key >>= html . itemHtml
+    -- GETting an image
     get (capture $ "/" ++ imgFilePath ++ "/:img") $ param "img" >>= file . (imgFilePath </>)
