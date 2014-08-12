@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module DataStore
     ( StoreCtx
     , withDataStore
@@ -19,7 +21,7 @@ import System.FilePath.Posix ((</>))
 
 
 import Control.Monad (void)
-import Control.Exception (finally, bracket)
+import Control.Exception (SomeException, throw, catch, bracket)
 import Database.HDBC
 import Database.HDBC.Sqlite3
 
@@ -79,5 +81,6 @@ getItem (StoreCtx c _) (Key k) = fmap (sqlValueToItem . head) $ withTransaction 
 putItem :: StoreCtx -> Item Text -> IO Key
 putItem ctx item = do
     item' <- fmap (\p -> item {image=p}) $ putImage (image item)
-    putItemWithKey ctx (makeKey item') item' `finally` removeFile (image item')
+    putItemWithKey ctx (makeKey item') item'
+        `catch` \(e :: SomeException) -> removeFile (image item') >> throw e
     return $ makeKey item'
