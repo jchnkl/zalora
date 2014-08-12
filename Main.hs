@@ -39,8 +39,6 @@ main :: IO ()
 main = withDataStore $ \ctx -> scotty servicePort $ do
     -- Simple JSON error handler for 500 (exceptions)
     defaultHandler   $ json . Error 500 "internal server error"
-    -- Simple JSON error handler for 400 (not found)
-    notFound         $ json $ Error 400 "client error" "service not found"
     -- POSTing an item
     post "/"         $ jsonItem >>= liftIO . putItem ctx >>= json
     -- GETting a list of items
@@ -49,3 +47,5 @@ main = withDataStore $ \ctx -> scotty servicePort $ do
     get "/item/:key" $ param "key" >>= liftIO . getItem ctx . Key >>= html . itemHtml
     -- GETting an image
     get (capture $ "/" ++ imgFilePath ++ "/:img") $ param "img" >>= file . (imgFilePath </>)
+    -- Simple JSON error handler for 400 (not found)
+    notFound         $ json $ Error 400 "client error" "service not found"
