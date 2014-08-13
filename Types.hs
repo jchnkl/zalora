@@ -24,7 +24,7 @@ data Item a = Item { description :: String
 
 data Error = Error { status :: Int
                    , message :: Text
-                   , exception :: Text
+                   , exception :: Maybe Text
                    }
     deriving (Read, Show)
 

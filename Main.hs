@@ -20,7 +20,7 @@ itemsHtml = pack . unlines . map toHtml
     where toHtml (Key k) = "<a href=item/" ++ k ++ ">" ++ k ++ "</a><br>"
 
 itemHtml :: Maybe (Item FilePath) -> Text
-itemHtml Nothing               = decodeUtf8 . encode $ Error 404 "item not found" ""
+itemHtml Nothing               = decodeUtf8 . encode $ Error 404 "item not found" Nothing
 itemHtml (Just (Item d c s p)) = mconcat
     [ "<table border=\"1\">"
     , "<tr>"
@@ -41,7 +41,7 @@ itemHtml (Just (Item d c s p)) = mconcat
 main :: IO ()
 main = withDataStore $ \ctx -> scotty servicePort $ do
     -- Simple JSON error handler for 500 (exceptions)
-    defaultHandler   $ json . Error 500 "internal server error"
+    defaultHandler   $ json . Error 500 "internal server error" . Just
     -- POSTing an item
     post "/"         $ jsonItem >>= liftIO . putItem ctx >>= json
     -- GETting a list of items
@@ -51,4 +51,4 @@ main = withDataStore $ \ctx -> scotty servicePort $ do
     -- GETting an image
     get (capture $ "/" ++ imgFilePath ++ "/:img") $ param "img" >>= file . (imgFilePath </>)
     -- Simple JSON error handler for 400 (not found)
-    notFound         $ json $ Error 400 "client error" "service not found"
+    notFound         $ json $ Error 400 "service not found" Nothing
