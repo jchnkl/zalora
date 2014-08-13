@@ -63,11 +63,11 @@ sqlValueToItem = (\(_:d:c:s:p:_) -> Item d c s p) . map fromSql
 makeKey :: Show a => a -> Key
 makeKey = Key . concatMap (flip showHex "") . unpack . hash . pack . show
 
-putImage :: Text -> IO FilePath
-putImage p = do
-    BL.writeFile path . decodeLenient . encodeUtf8 $ p
-    return path
-    where path = imgFilePath </> (key $ makeKey p) ++ ".jpg"
+makeImageFilePath :: Key -> FilePath
+makeImageFilePath (Key k) = imgFilePath </> k ++ ".jpg"
+
+putImage :: FilePath -> Text -> IO ()
+putImage path = BL.writeFile path . decodeLenient . encodeUtf8
 
 putItemWithKey :: StoreCtx -> Key -> Item FilePath -> IO ()
 putItemWithKey (StoreCtx c _) (Key k) items = void $ withTransaction c $ \c' ->
@@ -85,7 +85,12 @@ getItem (StoreCtx c _) (Key k) =
 
 putItem :: StoreCtx -> Item Text -> IO Key
 putItem ctx item = do
-    item' <- fmap (\p -> item {image=p}) $ putImage (image item)
-    putItemWithKey ctx (makeKey item') item'
-        `catch` \(e :: SomeException) -> removeFile (image item') >> throw e
-    return $ makeKey item'
+    putImage imageFilePath (image item)
+    putItemWithKey ctx dbItemKey dbItem `catch` \(e :: SomeException) -> do
+        removeFile imageFilePath
+        throw e
+    return dbItemKey
+    where
+    dbItem = item { image = imageFilePath }
+    dbItemKey = makeKey dbItem
+    imageFilePath = makeImageFilePath . makeKey $ (image item)
