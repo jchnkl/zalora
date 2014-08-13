@@ -40,6 +40,10 @@ table = unwords
     , "image TEXT)"
     ]
 
+safeHead :: [a] -> Maybe a
+safeHead []    = Nothing
+safeHead (a:_) = Just a
+
 withDataStore :: (StoreCtx -> IO a) -> IO a
 withDataStore f = do
     createDirectoryIfMissing False imgFilePath
@@ -74,9 +78,10 @@ getKeys :: StoreCtx -> IO [Key]
 getKeys (StoreCtx c _) = fmap (map (Key . fromSql) . concat) $ withTransaction c $ \c' ->
     quickQuery' c' ("SELECT key FROM items") []
 
-getItem :: StoreCtx -> Key -> IO (Item FilePath)
-getItem (StoreCtx c _) (Key k) = fmap (sqlValueToItem . head) $ withTransaction c $ \c' ->
-    quickQuery' c' ("SELECT * FROM items WHERE key == \"" ++ k ++ "\"") []
+getItem :: StoreCtx -> Key -> IO (Maybe (Item FilePath))
+getItem (StoreCtx c _) (Key k) =
+    fmap (fmap sqlValueToItem . safeHead) $ withTransaction c $ \c' ->
+        quickQuery' c' ("SELECT * FROM items WHERE key == \"" ++ k ++ "\"") []
 
 putItem :: StoreCtx -> Item Text -> IO Key
 putItem ctx item = do

@@ -2,7 +2,9 @@
 
 import Control.Monad.IO.Class (liftIO)
 import Data.Monoid (mconcat)
+import Data.Aeson (encode)
 import Data.Text.Lazy (Text, pack)
+import Data.Text.Lazy.Encoding (decodeUtf8)
 import System.FilePath ((</>))
 import Web.Scotty
 
@@ -17,8 +19,9 @@ itemsHtml :: [Key] -> Text
 itemsHtml = pack . unlines . map toHtml
     where toHtml (Key k) = "<a href=item/" ++ k ++ ">" ++ k ++ "</a><br>"
 
-itemHtml :: Item FilePath -> Text
-itemHtml (Item d c s p) = mconcat
+itemHtml :: Maybe (Item FilePath) -> Text
+itemHtml Nothing               = decodeUtf8 . encode $ Error 404 "item not found" ""
+itemHtml (Just (Item d c s p)) = mconcat
     [ "<table border=\"1\">"
     , "<tr>"
     , "<td>"
