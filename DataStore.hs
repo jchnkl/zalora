@@ -21,6 +21,7 @@ import System.FilePath.Posix ((</>))
 
 
 import Control.Monad (void)
+import Control.Applicative ((<$>))
 import Control.Exception (SomeException, throw, catch, bracket)
 import Database.HDBC
 import Database.HDBC.Sqlite3
@@ -54,11 +55,11 @@ withDataStore f = do
 withSqlConnection :: (Connection -> IO a) -> IO a
 withSqlConnection = bracket (connectSqlite3 dbFilePath) disconnect
 
-itemToSqlValue :: Item FilePath -> [SqlValue]
-itemToSqlValue (Item d c s p) = map toSql [d, c, s, p]
+itemToSqlValue :: Item Key -> [SqlValue]
+itemToSqlValue (Item d c s k) = map toSql [d, c, s, show k]
 
-sqlValueToItem :: [SqlValue] -> Item FilePath
-sqlValueToItem = (\(_:d:c:s:p:_) -> Item d c s p) . map fromSql
+sqlValueToItem :: [SqlValue] -> Item Key
+sqlValueToItem = (\(_:d:c:s:k:_) -> Item d c s $ read k) . map fromSql
 
 makeKey :: Show a => a -> Key
 makeKey = Key . concatMap (flip showHex "") . unpack . hash . pack . show
@@ -69,7 +70,7 @@ makeImageFilePath (Key k) = imgFilePath </> k ++ ".jpg"
 putImage :: FilePath -> Text -> IO ()
 putImage path = BL.writeFile path . decodeLenient . encodeUtf8
 
-putItemWithKey :: StoreCtx -> Key -> Item FilePath -> IO ()
+putItemWithKey :: StoreCtx -> Key -> Item Key -> IO ()
 putItemWithKey (StoreCtx c _) (Key k) items = void $ withTransaction c $ \c' ->
     run c' "INSERT INTO items VALUES (?, ?, ?, ?, ?);" $ values items
     where values = (toSql k :) . itemToSqlValue
@@ -80,8 +81,11 @@ getKeys (StoreCtx c _) = fmap (map (Key . fromSql) . concat) $ withTransaction c
 
 getItem :: StoreCtx -> Key -> IO (Maybe (Item FilePath))
 getItem (StoreCtx c _) (Key k) =
-    fmap (fmap sqlValueToItem . safeHead) $ withTransaction c $ \c' ->
+    fmap convertSqlValue $ withTransaction c $ \c' ->
         quickQuery' c' ("SELECT * FROM items WHERE key == \"" ++ k ++ "\"") []
+    where
+    convertSqlValue v = imageFilePath . sqlValueToItem <$> safeHead v
+    imageFilePath item = item { image = makeImageFilePath . image $ item }
 
 putItem :: StoreCtx -> Item Text -> IO Key
 putItem ctx item = do
@@ -91,6 +95,7 @@ putItem ctx item = do
         throw e
     return dbItemKey
     where
-    dbItem = item { image = imageFilePath }
+    dbItem = item { image = imageKey }
     dbItemKey = makeKey dbItem
-    imageFilePath = makeImageFilePath . makeKey $ (image item)
+    imageKey = makeKey $ image item
+    imageFilePath = makeImageFilePath imageKey
