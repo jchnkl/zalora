@@ -24,7 +24,7 @@
 
 
 
-Task:
+Task
 ===
 
 Write a FastCGI or HTTP server in Haskell that provides a restful API for managing an inventory of shoes:
@@ -46,3 +46,92 @@ as an `<img>` tag with "src" pointing to a path on the local filesystem (i.e. th
 photo must be accessible as a local file, not as a data URI).
 
 * `GET` a list of shoes as an HTML page with hyperlinks to all available shoes.
+
+
+
+Feedback
+===
+
+#### Pros
+
+- Includes README
+
+- Returns valid JSON with "id" when POSTing shoes, e.g.
+{"key":"7adb83aad0f0a74321696661ba96f6a17afb51aa"}
+
+- It is not possible to access the database or other files on the disk via HTTP :)
+
+- The data type for shoes (`Item`) is parametric over the image
+
+#### Neutral
+
+- Uses HDBC
+
+- README says
+
+curl -H "Content-Type: application/json" -d "$(< green.json)" http://localhost:8080/
+
+instead of
+
+curl -H "Content-Type: application/json" -d @green.json http://localhost:8080/
+
+- Cabal file contains an seemingly arbitrary list of `other-extensions` for no
+obvious reason
+
+- Cabal file contains several unused (transitive?) dependencies. Is this an
+attempt to simulate `cabal freeze`?
+
+- FromJSON instance is defined by hand, not derived (GHC generics).
+
+#### Cons
+
+- No automated tests
+
+- Returns 200 instead of 201 on POSTing shoe
+
+- Ids for shoes look like hashes, but they have different length?!
+
+(I think the issue here is that `showHex` is used to convert `Word8` into
+`ShowS`, if you used with e.g. numbers < 16, it's not zero padded..)
+
+
+- Accessing `/` results in 404, but returned JSON says `400`
+ > GET / HTTP/1.1
+ > User-Agent: curl/7.35.0
+ > Host: localhost:4040
+ > Accept: */*
+ >
+< HTTP/1.1 404 Not Found
+< Transfer-Encoding: chunked
+< Date: Wed, 13 Aug 2014 07:17:08 GMT
+* Server Warp/3.0.0.7 is not blacklisted
+< Server: Warp/3.0.0.7
+< Content-Type: application/json
+<
+* Connection #0 to host localhost left intact
+{"status":400,"exception":"service not found","message":"client error"}
+
+- No valid HTML when GETting list of shoes:
+
+$ curl http://localhost:4040/items
+7adb83aad0f0a74321696661ba96f6a17afb51aa
+<item/7adb83aad0f0a74321696661ba96f6a17afb51aa>
+
+
+(same is true for shoe details page)
+
+- Accesing `/item/` results in `Prelude.head: empty list` / server closing the
+connection..
+
+- When accessing the list of shoes through `/items/` instead of `/item` the
+links to the shoes do not work, because he uses relative links.
+
+- POSTing `blue.json` twice removes the image for the existing shoe and results in
+{"status":500,"exception":"SqlError {seState = "", seNativeError = 19,
+seErrorMsg = "step: UNIQUE constraint failed: items.key"}","message":"internal
+server error"}
+
+Furthermore the returned HTTP status code is 200 instead 500 (we will fix
+this in `scotty`, https://github.com/scotty-web/scotty/pull/111).
+
+- Accepts POSTed shoe with photo that is not valid Base64
